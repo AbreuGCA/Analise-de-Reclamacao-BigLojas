@@ -122,7 +122,9 @@ else:
             anos_disponiveis = sorted(df_filtrado['ANO'].unique())
             ano_mapa = st.selectbox("Recorte Anual do Mapa:", anos_disponiveis)
             df_mapa = df_filtrado[df_filtrado['ANO'] == ano_mapa].groupby('ESTADO').size().reset_index(name='Volume')
-            
+            top_estados = df_filtrado['ESTADO'].value_counts().head(5)
+
+
             if geojson_brasil:
                 fig_mapa = px.choropleth(df_mapa, geojson=geojson_brasil, locations='ESTADO', featureidkey='properties.sigla', color='Volume', color_continuous_scale="Reds", scope="south america")
                 fig_mapa.update_geos(fitbounds="locations", visible=False)
@@ -136,13 +138,27 @@ else:
             st.subheader("Princípio de Pareto (Ofensores Regionais)")
             df_pareto = df_filtrado.groupby('ESTADO').size().reset_index(name='Volume').sort_values('Volume', ascending=False)
             df_pareto['Perc_Acumulado'] = (df_pareto['Volume'].cumsum() / df_pareto['Volume'].sum()) * 100
+            top3 = df_pareto.head(3)['ESTADO'].tolist()
+
+            st.info(f"""
+            🚨 Regiões Críticas:
+            Os estados com maior volume de reclamações são: {', '.join(top3)}.
+            Essas regiões devem ser tratadas como prioridade máxima, pois concentram os maiores riscos de insatisfação do cliente.
+            """)
             
             fig_pareto = go.Figure()
             fig_pareto.add_trace(go.Bar(x=df_pareto['ESTADO'], y=df_pareto['Volume'], name='Volume de Queixas', marker_color='teal'))
             fig_pareto.add_trace(go.Scatter(x=df_pareto['ESTADO'], y=df_pareto['Perc_Acumulado'], name='% Acumulado', mode='lines+markers', line=dict(color='orange'), yaxis='y2'))
             fig_pareto.update_layout(template='plotly_white', yaxis2=dict(title='% Acumulado', overlaying='y', side='right', range=[0, 105]), showlegend=False, margin={"r":0,"t":0,"l":0,"b":0})
             st.plotly_chart(fig_pareto, use_container_width=True)
+            total = df_pareto['Volume'].sum()
+            top3_volume = df_pareto.head(3)['Volume'].sum()
+            perc = (top3_volume / total) * 100
 
+            st.success(f"""
+            📊 Concentração de Reclamações:
+            Os 3 principais estados concentram aproximadamente {perc:.2f}% de todas as reclamações.
+            """)
     # ==========================================
     # ABA 2: DEEP DIVE - LOGÍSTICA E RESOLUÇÃO
     # ==========================================
@@ -223,3 +239,12 @@ else:
         
         csv = df_filtrado[colunas_exibir].to_csv(sep=';', index=False, encoding='utf-8-sig')
         st.download_button("📥 Exportar Base para o Time (CSV)", data=csv, file_name='Plano_Acao_BigLojas.csv', mime='text/csv')
+    
+        st.markdown("""
+        ## Métricas do Dashboard
+        - Volume de Reclamações
+        - Distribuição Geográfica
+        - Tendência Temporal
+        - Taxa de Resolução
+        - Complexidade do Texto
+        """)
