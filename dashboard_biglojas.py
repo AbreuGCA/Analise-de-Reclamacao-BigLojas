@@ -94,6 +94,7 @@ st.set_page_config(
 
 @st.cache_resource
 def setup_nlp():
+    # Agora o modelo já estará instalado no ambiente
     return spacy.load('pt_core_news_sm')
 
 nlp = setup_nlp()
