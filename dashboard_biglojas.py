@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import requests
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 import spacy
 import numpy as np
 
@@ -89,16 +91,11 @@ st.set_page_config(
 )
 
 
+
 @st.cache_resource
 def setup_nlp():
-    # Carrega modelo spaCy para português
-    try:
-        nlp = spacy.load('pt_core_news_sm')
-    except OSError:
-        from spacy.cli.download import download
-        download('pt_core_news_sm')
-        nlp = spacy.load('pt_core_news_sm')
-    return nlp
+    # Agora o modelo já estará instalado no ambiente
+    return spacy.load('pt_core_news_sm')
 
 nlp = setup_nlp()
 
