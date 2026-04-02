@@ -9,10 +9,12 @@ import matplotlib
 matplotlib.use('Agg')
 import spacy
 import numpy as np
-
 import re
 import unicodedata
 
+# ==========================================
+# CONSTANTES E DICIONÁRIOS
+# ==========================================
 UF_BRASIL = [
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
     "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC",
@@ -47,6 +49,9 @@ ESTADOS_INVALIDOS = {
     "ESTADO NÃO INFORMADO", "ESTADO NAO INFORMADO", "CIDADE NÃO INFORMADA"
 }
 
+# ==========================================
+# FUNÇÕES DE TRATAMENTO
+# ==========================================
 def normalizar_texto_base(valor: str) -> str:
     if pd.isna(valor):
         return ""
@@ -90,12 +95,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-
-
 @st.cache_resource
 def setup_nlp():
-    # Agora o modelo já estará instalado no ambiente
-    return spacy.load('pt_core_news_sm')
+    # O modelo pt_core_news_sm deve ser baixado pelo link no requirements.txt
+    try:
+        return spacy.load('pt_core_news_sm')
+    except OSError:
+        st.error("Erro ao carregar o modelo de linguagem. Verifique o requirements.txt.")
+        return None
 
 nlp = setup_nlp()
 
@@ -111,11 +118,16 @@ geojson_brasil = carregar_geojson()
 
 @st.cache_data
 def carregar_dados():
-    df = pd.read_csv('BIGLOJAS_DADOS_TRATADOS_FINAL.csv', sep=';', encoding='utf-8-sig')
-    df['ANO_MES'] = df['ANO'].astype(str) + '-' + df['MES'].astype(str).str.zfill(2)
-    df['DESCRICAO'] = df['DESCRICAO'].astype(str)
-    df['TAMANHO_TEXTO'] = df['DESCRICAO'].apply(len)
-    return df
+    # Adicionado tratamento de erros para leitura do arquivo
+    try:
+        df = pd.read_csv('BIGLOJAS_DADOS_TRATADOS_FINAL.csv', sep=';', encoding='utf-8-sig')
+        df['ANO_MES'] = df['ANO'].astype(str) + '-' + df['MES'].astype(str).str.zfill(2)
+        df['DESCRICAO'] = df['DESCRICAO'].astype(str)
+        df['TAMANHO_TEXTO'] = df['DESCRICAO'].apply(len)
+        return df
+    except FileNotFoundError:
+        st.error("Arquivo BIGLOJAS_DADOS_TRATADOS_FINAL.csv não encontrado. Certifique-se de que ele está na raiz do repositório.")
+        st.stop()
 
 df = carregar_dados()
 
@@ -155,7 +167,7 @@ st.title("📈 Análise de Reclamações - BIG Lojas")
 st.divider()
 
 if df_filtrado.empty:
-    st.error("Nenhum dado encontrado com os filtros atuais. Por favor, ajuste a barra lateral.")
+    st.warning("Nenhum dado encontrado com os filtros atuais. Por favor, ajuste a barra lateral.")
 else:
     aba_macro, aba_logistica, aba_ambiente, aba_dados = st.tabs([
         "🌐 1. Visão Macro (Brasil)",
@@ -179,7 +191,7 @@ else:
         fig_tempo.add_trace(go.Scatter(x=df_tempo['ANO_MES'], y=df_tempo['Volume'], mode='lines+markers', name='Volume Real', line=dict(color='#1f77b4', width=2)))
         fig_tempo.add_trace(go.Scatter(x=df_tempo['ANO_MES'], y=df_tempo['Media_Movel'], mode='lines', name='Média Móvel (Tendência)', line=dict(color='red', dash='dash', width=3)))
         fig_tempo.update_layout(template='plotly_white', hovermode='x unified', height=400)
-        st.plotly_chart(fig_tempo, width='stretch')
+        st.plotly_chart(fig_tempo, use_container_width=True)
 
         col_mapa, col_pareto = st.columns(2)
 
@@ -194,12 +206,8 @@ else:
             df_mapa = base_estados.merge(df_mapa, on='ESTADO', how='left').fillna({'Volume': 0})
             df_mapa['Volume'] = df_mapa['Volume'].astype(int)
 
-            # ── MELHORIA DO MAPA ──────────────────────────────────────────
-            # Escala logarítmica para separar valores próximos de zero dos
-            # estados que realmente têm volume = 0 (exibidos em cinza claro)
             df_mapa['Volume_Log'] = np.log1p(df_mapa['Volume'])
 
-            # Colorscale: cinza para 0, gradiente vermelho para > 0
             colorscale_mapa = [
                 [0.00, '#d6d6d6'],
                 [0.01, '#fde0d0'],
@@ -216,7 +224,7 @@ else:
                     geojson=geojson_brasil,
                     locations='ESTADO',
                     featureidkey='properties.sigla',
-                    color='Volume_Log',           # usa escala log para cor
+                    color='Volume_Log',
                     color_continuous_scale=colorscale_mapa,
                     scope="south america",
                     hover_data={'Volume': True, 'Volume_Log': False, 'ESTADO': True},
@@ -227,34 +235,22 @@ else:
                     margin={"r": 0, "t": 0, "l": 0, "b": 0},
                     coloraxis_colorbar=dict(
                         title="Ocorrências",
-                        tickvals=[np.log1p(v) for v in [0, 1, 5, 10, 50, 100, 500]
-                                  if np.log1p(v) <= df_mapa['Volume_Log'].max()],
-                        ticktext=[str(v) for v in [0, 1, 5, 10, 50, 100, 500]
-                                  if np.log1p(v) <= df_mapa['Volume_Log'].max()],
+                        tickvals=[np.log1p(v) for v in [0, 1, 5, 10, 50, 100, 500] if np.log1p(v) <= df_mapa['Volume_Log'].max()],
+                        ticktext=[str(v) for v in [0, 1, 5, 10, 50, 100, 500] if np.log1p(v) <= df_mapa['Volume_Log'].max()],
                     )
                 )
-                st.plotly_chart(fig_mapa, width='stretch')
+                st.plotly_chart(fig_mapa, use_container_width=True)
 
-                # Legenda explicativa
                 col_leg1, col_leg2 = st.columns(2)
                 with col_leg1:
-                    st.markdown(
-                        "<span style='background:#d6d6d6;padding:2px 8px;border-radius:4px;'>&nbsp;&nbsp;&nbsp;&nbsp;</span>"
-                        " &nbsp;**Sem ocorrências (0)**",
-                        unsafe_allow_html=True
-                    )
+                    st.markdown("<span style='background:#d6d6d6;padding:2px 8px;border-radius:4px;'>&nbsp;&nbsp;&nbsp;&nbsp;</span> &nbsp;**Sem ocorrências (0)**", unsafe_allow_html=True)
                 with col_leg2:
-                    st.markdown(
-                        "<span style='background:#fc8d59;padding:2px 8px;border-radius:4px;'>&nbsp;&nbsp;&nbsp;&nbsp;</span>"
-                        " &nbsp;**Com ocorrências (escala log)**",
-                        unsafe_allow_html=True
-                    )
+                    st.markdown("<span style='background:#fc8d59;padding:2px 8px;border-radius:4px;'>&nbsp;&nbsp;&nbsp;&nbsp;</span> &nbsp;**Com ocorrências (escala log)**", unsafe_allow_html=True)
 
                 if estados_zero:
                     st.caption("🔘 Estados sem ocorrências no recorte: " + ", ".join(estados_zero))
             else:
-                st.warning("Coordenadas do mapa indisponíveis.")
-            # ─────────────────────────────────────────────────────────────
+                st.warning("Coordenadas do mapa indisponíveis no momento.")
 
         with col_pareto:
             st.subheader("Princípio de Pareto (Ofensores Regionais)")
@@ -262,25 +258,19 @@ else:
             df_pareto['Perc_Acumulado'] = (df_pareto['Volume'].cumsum() / df_pareto['Volume'].sum()) * 100
             top3 = df_pareto.head(3)['ESTADO'].tolist()
 
-            st.info(f"""
-            🚨 Regiões Críticas:
-            Os estados com maior volume de reclamações são: {', '.join(top3)}.
-            Essas regiões devem ser tratadas como prioridade máxima.
-            """)
+            st.info(f"🚨 **Regiões Críticas:** Os estados com maior volume de reclamações são: **{', '.join(top3)}**. Estas regiões devem ser tratadas como prioridade máxima.")
 
             fig_pareto = go.Figure()
             fig_pareto.add_trace(go.Bar(x=df_pareto['ESTADO'], y=df_pareto['Volume'], name='Volume de Queixas', marker_color='teal'))
             fig_pareto.add_trace(go.Scatter(x=df_pareto['ESTADO'], y=df_pareto['Perc_Acumulado'], name='% Acumulado', mode='lines+markers', line=dict(color='orange'), yaxis='y2'))
             fig_pareto.update_layout(template='plotly_white', yaxis2=dict(title='% Acumulado', overlaying='y', side='right', range=[0, 105]), showlegend=False, margin={"r": 0, "t": 0, "l": 0, "b": 0})
-            st.plotly_chart(fig_pareto, width='stretch')
+            st.plotly_chart(fig_pareto, use_container_width=True)
 
             total = df_pareto['Volume'].sum()
-            top3_volume = df_pareto.head(3)['Volume'].sum()
-            perc = (top3_volume / total) * 100
-            st.success(f"""
-            📊 Concentração de Reclamações:
-            Os 3 principais estados concentram aproximadamente {perc:.2f}% de todas as reclamações.
-            """)
+            if total > 0:
+                top3_volume = df_pareto.head(3)['Volume'].sum()
+                perc = (top3_volume / total) * 100
+                st.success(f"📊 **Concentração de Reclamações:** Os 3 principais estados concentram aproximadamente **{perc:.2f}%** de todas as reclamações exibidas.")
 
     # ==========================================
     # ABA 2: DEEP DIVE - LOGÍSTICA E RESOLUÇÃO
@@ -300,13 +290,13 @@ else:
                 df_status.columns = ['STATUS', 'Volume']
                 fig_status = px.pie(df_status, names='STATUS', values='Volume', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
                 fig_status.update_traces(textposition='inside', textinfo='percent+label')
-                st.plotly_chart(fig_status, width='stretch')
+                st.plotly_chart(fig_status, use_container_width=True)
 
             with c2:
                 st.subheader("Correlação: Frustração x Status")
                 fig_box = px.box(df_log, x='STATUS', y='TAMANHO_TEXTO', color='STATUS', template='plotly_white')
                 fig_box.update_layout(showlegend=False, yaxis_title="Tamanho do Texto (Caracteres)", xaxis_title="Status atual")
-                st.plotly_chart(fig_box, width='stretch')
+                st.plotly_chart(fig_box, use_container_width=True)
 
     # ==========================================
     # ABA 3: DEEP DIVE - AMBIENTE E NLP
@@ -327,36 +317,42 @@ else:
                 pareto_amb.columns = ['Categoria', 'Volume']
                 fig_bar_amb = px.bar(pareto_amb, x='Volume', y='Categoria', orientation='h', template='plotly_white', color='Volume', color_continuous_scale='Teal')
                 fig_bar_amb.update_layout(yaxis={'categoryorder': 'total ascending'})
-                st.plotly_chart(fig_bar_amb, width='stretch')
+                st.plotly_chart(fig_bar_amb, use_container_width=True)
 
             with c2:
                 st.subheader("Mineração de Sentimentos (WordCloud)")
+                
+                if nlp is not None:
+                    texto_completo = " ".join(descricao for descricao in df_amb['DESCRICAO'].dropna())
+                    
+                    # Evitar processar textos gigantescos que travam o Streamlit Cloud
+                    if len(texto_completo) > 100000:
+                        texto_completo = texto_completo[:100000]
 
-                texto_completo = " ".join(descricao for descricao in df_amb['DESCRICAO'].dropna())
+                    doc = nlp(texto_completo)
+                    palavras_filtradas = [
+                        token.lemma_.lower() for token in doc
+                        if token.pos_ in ["NOUN", "ADJ"] and len(token.lemma_) > 3 and not token.is_stop and token.is_alpha
+                    ]
+                    texto_filtrado = " ".join(palavras_filtradas)
 
-                # Processa texto com spaCy e filtra apenas substantivos e adjetivos
-                doc = nlp(texto_completo)
-                palavras_filtradas = [
-                    token.lemma_.lower() for token in doc
-                    if token.pos_ in ["NOUN", "ADJ"] and len(token.lemma_) > 3 and not token.is_stop and token.is_alpha
-                ]
-                texto_filtrado = " ".join(palavras_filtradas)
-
-                if texto_filtrado:
-                    wordcloud = WordCloud(
-                        stopwords=None,
-                        background_color="white",
-                        width=800,
-                        height=400,
-                        colormap='magma',
-                        max_words=80
-                    ).generate(texto_filtrado)
-                    fig_wc, ax = plt.subplots(figsize=(10, 5))
-                    ax.imshow(wordcloud, interpolation='bilinear')
-                    ax.axis('off')
-                    st.pyplot(fig_wc)
+                    if texto_filtrado:
+                        wordcloud = WordCloud(
+                            stopwords=None,
+                            background_color="white",
+                            width=800,
+                            height=400,
+                            colormap='magma',
+                            max_words=80
+                        ).generate(texto_filtrado)
+                        fig_wc, ax = plt.subplots(figsize=(10, 5))
+                        ax.imshow(wordcloud, interpolation='bilinear')
+                        ax.axis('off')
+                        st.pyplot(fig_wc)
+                    else:
+                        st.info("Texto insuficiente para gerar WordCloud.")
                 else:
-                    st.info("Texto insuficiente para gerar WordCloud.")
+                    st.warning("O modelo NLP não pôde ser carregado. A nuvem de palavras não será exibida.")
 
     # ==========================================
     # ABA 4: PLANO DE AÇÃO E EXTRAÇÃO
@@ -368,16 +364,16 @@ else:
         colunas = ['ID', 'DATA', 'STATUS', 'ESTADO', 'CATEGORIA_ANALITICA', 'OBJETIVO_PROJETO', 'TAMANHO_TEXTO', 'DESCRICAO']
         colunas_exibir = [col for col in colunas if col in df_filtrado.columns]
 
-        st.dataframe(df_filtrado[colunas_exibir], width='stretch', height=400)
+        st.dataframe(df_filtrado[colunas_exibir], use_container_width=True, height=400)
 
         csv = df_filtrado[colunas_exibir].to_csv(sep=';', index=False, encoding='utf-8-sig')
         st.download_button("📥 Exportar Base para o Time (CSV)", data=csv, file_name='Plano_Acao_BigLojas.csv', mime='text/csv')
 
         st.markdown("""
-        ## Métricas do Dashboard
-        - Volume de Reclamações
-        - Distribuição Geográfica
-        - Tendência Temporal
-        - Taxa de Resolução
-        - Complexidade do Texto
+        ### Métricas do Dashboard
+        * Volume de Reclamações
+        * Distribuição Geográfica
+        * Tendência Temporal
+        * Taxa de Resolução
+        * Complexidade do Texto
         """)
