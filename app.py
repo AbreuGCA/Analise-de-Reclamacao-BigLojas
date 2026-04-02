@@ -321,20 +321,26 @@ else:
 
             with c2:
                 st.subheader("Mineração de Sentimentos (WordCloud)")
-                
+
                 if nlp is not None:
-                    texto_completo = " ".join(descricao for descricao in df_amb['DESCRICAO'].dropna())
-                    
+                    # Usa apenas uma amostra se o filtro for muito grande
+                    descricoes_validas = df_amb['DESCRICAO'].dropna()
+                    amostra_texto = descricoes_validas.sample(min(800, len(descricoes_validas)), random_state=42) if len(descricoes_validas) > 0 else []
+                    texto_completo = " ".join(amostra_texto.astype(str))
+
                     # Evitar processar textos gigantescos que travam o Streamlit Cloud
                     if len(texto_completo) > 100000:
                         texto_completo = texto_completo[:100000]
 
-                    doc = nlp(texto_completo)
-                    palavras_filtradas = [
-                        token.lemma_.lower() for token in doc
-                        if token.pos_ in ["NOUN", "ADJ"] and len(token.lemma_) > 3 and not token.is_stop and token.is_alpha
-                    ]
-                    texto_filtrado = " ".join(palavras_filtradas)
+                    if texto_completo:
+                        doc = nlp(texto_completo)
+                        palavras_filtradas = [
+                            token.lemma_.lower() for token in doc
+                            if token.pos_ in ["NOUN", "ADJ"] and len(token.lemma_) > 3 and not token.is_stop and token.is_alpha
+                        ]
+                        texto_filtrado = " ".join(palavras_filtradas)
+                    else:
+                        texto_filtrado = ""
 
                     if texto_filtrado:
                         wordcloud = WordCloud(

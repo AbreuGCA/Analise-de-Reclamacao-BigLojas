@@ -4,7 +4,5 @@ plotly
 requests
 wordcloud
 matplotlib
-nbformat
-spacy
-spacy-lookups-data
-https://github.com/explosion/spacy-models/releases/download/pt_core_news_sm-3.7.0/pt_core_news_sm-3.7.0-py3-none-any.whl
+spacy>=3.7.0,<3.8.0
+pt_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/pt_core_news_sm-3.7.0/pt_core_news_sm-3.7.0-py3-none-any.whl
