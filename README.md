@@ -28,3 +28,4 @@ O fluxo de dados segue uma linha de raciocínio de  **Data Storytelling** , part
 * **Plotly** : Gráficos dinâmicos e interativos.
 * **Streamlit** : Framework para publicação do Dashboard em nuvem.
 * **Regex** : Extração de padrões textuais para classificação de queixas.
+* **NLP** : Processamento de Linguagem Natural voltada no português para melhorar o filtro do WorldCloud.

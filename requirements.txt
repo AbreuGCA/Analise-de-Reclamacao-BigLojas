@@ -1,0 +1,10 @@
+streamlit
+pandas
+plotly
+requests
+wordcloud
+matplotlib
+nbformat
+spacy
+spacy-lookups-data
+pt_core_news_sm
