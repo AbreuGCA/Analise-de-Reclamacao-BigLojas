@@ -1,0 +1,49 @@
+# ==========================================
+# 1. Ambientes Virtuais Python
+# ==========================================
+# Ignora as pastas onde as bibliotecas (pandas, streamlit, etc) são instaladas localmente
+.venv/
+venv/
+env/
+ENV/
+
+# ==========================================
+# 2. Arquivos de Cache do Python e Streamlit
+# ==========================================
+# O Python compila arquivos temporários para rodar mais rápido. Não precisamos enviá-los.
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# ==========================================
+# 3. Jupyter Notebooks
+# ==========================================
+# Ignora os arquivos de backup e checkpoints automáticos que o Jupyter cria
+.ipynb_checkpoints/
+
+# ==========================================
+# 4. Dados Baixados via Código (NLP)
+# ==========================================
+# Ignora a pasta caso o NLTK baixe as stopwords dentro do diretório do projeto
+nltk_data/
+
+# ==========================================
+# 5. Arquivos de Sistema Operacional (Windows / Mac)
+# ==========================================
+# Arquivos de thumbnail do Windows e arquivos ocultos do macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==========================================
+# 6. Configurações de IDEs (VSCode, PyCharm)
+# ==========================================
+# Ignora as configurações de aparência do editor de código do seu computador
+.vscode/
+.idea/
